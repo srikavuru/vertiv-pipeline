@@ -1365,9 +1365,9 @@ If any field is not found, use an empty string.`
       key={card.id}
       draggable
       onDragStart={(e) => handleDragStart(card, columnId, e)}
-      onDoubleClick={() => openCRMModal(card, columnId)}
+      onClick={() => openCRMModal(card, columnId)}
       className="group relative"
-      style={{ cursor: 'grab' }}
+      style={{ cursor: 'pointer' }}
     >
       <div
         className="bg-white rounded-lg shadow hover:shadow-lg transition-all border-l-4"
@@ -1396,7 +1396,7 @@ If any field is not found, use an empty string.`
               />
             </button>
             <button
-              onClick={() => deleteCard(columnId, card.id)}
+              onClick={(e) => { e.stopPropagation(); deleteCard(columnId, card.id); }}
               className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 flex-shrink-0 transition-all"
             >
               <X className="w-4 h-4" />
@@ -1427,7 +1427,7 @@ If any field is not found, use an empty string.`
 
         <div className="flex items-center justify-end mt-3 pt-2 border-t border-gray-100">
           <button
-            onClick={() => openCRMModal(card, columnId)}
+            onClick={(e) => { e.stopPropagation(); openCRMModal(card, columnId); }}
             className="text-xs font-semibold flex items-center gap-1 transition-colors hover:text-orange-600"
             style={{ color: '#E84E26' }}
           >
@@ -1444,9 +1444,9 @@ If any field is not found, use an empty string.`
       key={card.id}
       draggable
       onDragStart={(e) => handleDragStart(card, columnId, e)}
-      onDoubleClick={() => openCRMModal(card, columnId)}
+      onClick={() => openCRMModal(card, columnId)}
       className="group relative"
-      style={{ cursor: 'grab' }}
+      style={{ cursor: 'pointer' }}
     >
       <div
         className="bg-white rounded-lg shadow hover:shadow-lg transition-all border-l-4"
@@ -1464,7 +1464,10 @@ If any field is not found, use an empty string.`
               />
             )}
             <button
-              onClick={() => card.fileData && openPDF(card.fileData, card.title)}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (card.fileData) openPDF(card.fileData, card.title);
+              }}
               className="flex-1 text-left"
               disabled={!card.fileData}
             >
@@ -1489,7 +1492,7 @@ If any field is not found, use an empty string.`
               />
             </button>
             <button
-              onClick={() => deleteCard(columnId, card.id)}
+              onClick={(e) => { e.stopPropagation(); deleteCard(columnId, card.id); }}
               className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-600 flex-shrink-0 transition-all"
             >
               <X className="w-4 h-4" />
@@ -1513,7 +1516,14 @@ If any field is not found, use an empty string.`
           {card.email && (
             <div className="flex items-center gap-1.5 text-xs text-gray-600">
               <Mail className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#E84E26' }} />
-              <span className="truncate flex-1">{card.email}</span>
+              <a
+                href={`mailto:${card.email}?subject=${encodeURIComponent('Opportunity at Vertiv')}`}
+                onClick={(e) => e.stopPropagation()}
+                className="truncate flex-1 hover:text-orange-600 hover:underline transition-colors"
+                title="Send email"
+              >
+                {card.email}
+              </a>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -1607,7 +1617,7 @@ If any field is not found, use an empty string.`
             )}
           </div>
           <button
-            onClick={() => openCRMModal(card, columnId)}
+            onClick={(e) => { e.stopPropagation(); openCRMModal(card, columnId); }}
             className="text-xs font-semibold flex items-center gap-1 ml-auto transition-colors hover:text-orange-600"
             style={{ color: '#E84E26' }}
           >
@@ -2372,6 +2382,127 @@ If any field is not found, use an empty string.`
         </div>
       )}
       
+      {/* CRM Edit Modal */}
+      {showCRMModal && selectedCard && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="px-6 py-4 flex items-center justify-between border-b-4" style={{ borderBottomColor: '#E84E26' }}>
+              <h2 className="text-xl font-bold text-gray-800">Edit Record</h2>
+              <button
+                onClick={() => {
+                  setShowCRMModal(false);
+                  setSelectedCard(null);
+                }}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Name / Title</label>
+                <input
+                  type="text"
+                  value={selectedCard.title || ''}
+                  onChange={(e) => setSelectedCard({...selectedCard, title: e.target.value})}
+                  className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-orange-500 focus:outline-none"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={selectedCard.email || ''}
+                    onChange={(e) => setSelectedCard({...selectedCard, email: e.target.value})}
+                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-orange-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Phone</label>
+                  <input
+                    type="tel"
+                    value={selectedCard.phone || ''}
+                    onChange={(e) => setSelectedCard({...selectedCard, phone: e.target.value})}
+                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-orange-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Company</label>
+                  <input
+                    type="text"
+                    value={selectedCard.companyName || ''}
+                    onChange={(e) => setSelectedCard({...selectedCard, companyName: e.target.value})}
+                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-orange-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Status</label>
+                  <select
+                    value={selectedCard.status || ''}
+                    onChange={(e) => setSelectedCard({...selectedCard, status: e.target.value})}
+                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-orange-500 focus:outline-none"
+                  >
+                    <option value="">Select status</option>
+                    {statusOptions.map(status => (
+                      <option key={status} value={status}>{status}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Follow-up Date</label>
+                <input
+                  type="date"
+                  value={selectedCard.followUpDate || ''}
+                  onChange={(e) => setSelectedCard({...selectedCard, followUpDate: e.target.value})}
+                  className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-orange-500 focus:outline-none"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Notes</label>
+                <textarea
+                  value={selectedCard.notes || ''}
+                  onChange={(e) => setSelectedCard({...selectedCard, notes: e.target.value})}
+                  rows={4}
+                  className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-orange-500 focus:outline-none resize-none"
+                />
+              </div>
+
+              {selectedCard._sourceBoardName && (
+                <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
+                  From board: <span className="font-semibold">{selectedCard._sourceBoardName}</span>
+                </div>
+              )}
+            </div>
+            
+            <div className="px-6 py-4 border-t bg-gray-50 flex gap-3">
+              <button
+                onClick={() => openMoveModal(selectedCard, selectedCard.columnId)}
+                className="px-4 py-2 border-2 border-gray-300 rounded-lg hover:bg-gray-100 transition-colors font-semibold text-gray-700 flex items-center gap-2"
+              >
+                <Copy className="w-4 h-4" />
+                Move
+              </button>
+              <button
+                onClick={updateCardCRM}
+                className="flex-1 py-2 px-4 rounded-lg font-bold text-white transition-all hover:opacity-90"
+                style={{ backgroundColor: '#E84E26' }}
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {boardToDelete && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
