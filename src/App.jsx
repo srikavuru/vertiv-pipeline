@@ -1516,14 +1516,17 @@ If any field is not found, use an empty string.`
           {card.email && (
             <div className="flex items-center gap-1.5 text-xs text-gray-600">
               <Mail className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#E84E26' }} />
-              <a
-                href={`mailto:${card.email}?subject=${encodeURIComponent('Opportunity at Vertiv')}`}
-                onClick={(e) => e.stopPropagation()}
-                className="truncate flex-1 hover:text-orange-600 hover:underline transition-colors"
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  window.location.href = `mailto:${card.email}?subject=${encodeURIComponent('Opportunity at Vertiv')}`;
+                }}
+                className="truncate flex-1 hover:text-orange-600 hover:underline transition-colors text-left"
                 title="Send email"
               >
                 {card.email}
-              </a>
+              </button>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -2141,6 +2144,203 @@ If any field is not found, use an empty string.`
       </div>
 
       {/* Add remaining modals here - I'll continue in next message if needed */}
+      
+      {/* Add Column Modal */}
+      {showAddColumnModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+            <div className="px-6 py-4 flex items-center justify-between border-b-4" style={{ borderBottomColor: '#E84E26' }}>
+              <h2 className="text-xl font-bold text-gray-800">Add Column</h2>
+              <button
+                onClick={() => {
+                  setShowAddColumnModal(false);
+                  setNewColumnTitle('');
+                }}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Column Title</label>
+                <input
+                  type="text"
+                  value={newColumnTitle}
+                  onChange={(e) => setNewColumnTitle(e.target.value)}
+                  placeholder="e.g., Interview Scheduled"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-orange-500 focus:outline-none text-sm"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') addNewColumn();
+                  }}
+                />
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={addNewColumn}
+                  className="flex-1 py-3 px-4 rounded-lg font-bold text-white transition-all hover:opacity-90"
+                  style={{ backgroundColor: '#E84E26' }}
+                >
+                  Add Column
+                </button>
+                <button
+                  onClick={() => {
+                    setShowAddColumnModal(false);
+                    setNewColumnTitle('');
+                  }}
+                  className="px-6 py-3 border-2 border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-semibold text-gray-700"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CSV Import Modal */}
+      {showCSVImportModal && csvData && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="px-6 py-4 flex items-center justify-between border-b-4" style={{ borderBottomColor: '#E84E26' }}>
+              <h2 className="text-xl font-bold text-gray-800">Import CSV - Map Fields</h2>
+              <button
+                onClick={() => {
+                  setShowCSVImportModal(false);
+                  setCsvData(null);
+                  setCsvHeaders([]);
+                }}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1 space-y-4">
+              <p className="text-sm text-gray-600">
+                Found {csvData.length} rows. Map CSV columns to card fields:
+              </p>
+              
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Import to Column</label>
+                <select
+                  value={importToColumn}
+                  onChange={(e) => setImportToColumn(e.target.value)}
+                  className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-orange-500 focus:outline-none"
+                >
+                  {Object.entries(columns).map(([colId, col]) => (
+                    <option key={colId} value={colId}>{col.title}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Name</label>
+                  <select
+                    value={fieldMapping.clientName}
+                    onChange={(e) => setFieldMapping({...fieldMapping, clientName: e.target.value})}
+                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-orange-500 focus:outline-none"
+                  >
+                    <option value="">-- Select --</option>
+                    {csvHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Email</label>
+                  <select
+                    value={fieldMapping.email}
+                    onChange={(e) => setFieldMapping({...fieldMapping, email: e.target.value})}
+                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-orange-500 focus:outline-none"
+                  >
+                    <option value="">-- Select --</option>
+                    {csvHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Phone</label>
+                  <select
+                    value={fieldMapping.phone}
+                    onChange={(e) => setFieldMapping({...fieldMapping, phone: e.target.value})}
+                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-orange-500 focus:outline-none"
+                  >
+                    <option value="">-- Select --</option>
+                    {csvHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Company</label>
+                  <select
+                    value={fieldMapping.companyName}
+                    onChange={(e) => setFieldMapping({...fieldMapping, companyName: e.target.value})}
+                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-orange-500 focus:outline-none"
+                  >
+                    <option value="">-- Select --</option>
+                    {csvHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Notes</label>
+                  <select
+                    value={fieldMapping.notes}
+                    onChange={(e) => setFieldMapping({...fieldMapping, notes: e.target.value})}
+                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-orange-500 focus:outline-none"
+                  >
+                    <option value="">-- Select --</option>
+                    {csvHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Status</label>
+                  <select
+                    value={fieldMapping.status}
+                    onChange={(e) => setFieldMapping({...fieldMapping, status: e.target.value})}
+                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-orange-500 focus:outline-none"
+                  >
+                    <option value="">-- Select --</option>
+                    {csvHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                  </select>
+                </div>
+              </div>
+              
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <p className="text-xs text-gray-500 font-semibold mb-2">Preview (first 3 rows):</p>
+                <div className="text-xs space-y-1 max-h-32 overflow-y-auto">
+                  {csvData.slice(0, 3).map((row, i) => (
+                    <div key={i} className="bg-white p-2 rounded border">
+                      {fieldMapping.clientName && <span className="font-semibold">{row[fieldMapping.clientName]}</span>}
+                      {fieldMapping.email && <span className="text-gray-500 ml-2">{row[fieldMapping.email]}</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            <div className="px-6 py-4 border-t bg-gray-50 flex gap-3">
+              <button
+                onClick={importCSVData}
+                className="flex-1 py-3 px-4 rounded-lg font-bold text-white transition-all hover:opacity-90"
+                style={{ backgroundColor: '#E84E26' }}
+              >
+                Import {csvData.length} Records
+              </button>
+              <button
+                onClick={() => {
+                  setShowCSVImportModal(false);
+                  setCsvData(null);
+                  setCsvHeaders([]);
+                }}
+                className="px-6 py-3 border-2 border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-semibold text-gray-700"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* New Board Modal */}
       {showNewBoardModal && (
