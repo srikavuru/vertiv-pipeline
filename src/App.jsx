@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, X, GripVertical, Mail, Phone, Building, User, Calendar, Edit2, Save, MoreHorizontal, Search, Download, Trash2, Copy, Star, Menu, Pin, FileText, FileSpreadsheet } from 'lucide-react';
+import { Upload, X, GripVertical, Mail, Phone, Building, User, Calendar, Edit2, MoreHorizontal, Search, Download, Trash2, Copy, Star, Menu, Pin, FileText, FileSpreadsheet } from 'lucide-react';
 import Papa from 'papaparse';
 
 // Your restored backup data
@@ -38,6 +38,7 @@ export default function PDFKanban() {
   const [showAddColumnModal, setShowAddColumnModal] = useState(false);
   const [newColumnTitle, setNewColumnTitle] = useState('');
   const [showStatusMenu, setShowStatusMenu] = useState(null);
+  const [showFollowUpPicker, setShowFollowUpPicker] = useState(null);
   const [uploadNotification, setUploadNotification] = useState(null);
   const [showMoveModal, setShowMoveModal] = useState(false);
   const [cardToMove, setCardToMove] = useState(null);
@@ -114,7 +115,7 @@ export default function PDFKanban() {
           setCurrentBoardId(RESTORED_BACKUP.currentBoardId);
         }
       } catch (error) {
-        console.log('Error loading, using backup:', error);
+        console.warn('Error loading data, using backup:', error);
         setBoards(RESTORED_BACKUP.boards);
         setCurrentBoardId(RESTORED_BACKUP.currentBoardId);
       } finally {
@@ -195,7 +196,7 @@ export default function PDFKanban() {
           lastBackupTime,
           timestamp: Date.now()
         }));
-        console.log('Data saved successfully');
+        // Data saved successfully
       } catch (error) {
         console.error('Error saving data:', error);
       }
@@ -726,7 +727,8 @@ If any field is not found, use an empty string.`
             ...card,
             _sourceBoardId: boardId,
             _sourceBoardName: board.name,
-            _sourceColumnId: columnId
+            _sourceColumnId: columnId,
+            _sourceColumnName: column.title
           };
 
           if (followUpDate < today) {
@@ -1342,6 +1344,23 @@ If any field is not found, use an empty string.`
     setShowStatusMenu(null);
   };
 
+  const updateCardFollowUp = (columnId, cardId, newDate) => {
+    setColumns(prev => ({
+      ...prev,
+      [columnId]: {
+        ...prev[columnId],
+        cards: prev[columnId].cards.map(c => 
+          c.id === cardId ? { ...c, followUpDate: newDate } : c
+        )
+      }
+    }));
+    setShowFollowUpPicker(null);
+    if (newDate) {
+      setUploadNotification(`✓ Follow-up set for ${new Date(newDate).toLocaleDateString()}`);
+      setTimeout(() => setUploadNotification(null), 2000);
+    }
+  };
+
   const filterCards = (cards) => {
     return cards.filter(card => {
       const matchesSearch = searchQuery === '' || 
@@ -1618,6 +1637,81 @@ If any field is not found, use an empty string.`
                 Resume
               </button>
             )}
+            <div className="relative">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowFollowUpPicker(showFollowUpPicker === card.id ? null : card.id);
+                }}
+                className={`text-xs font-semibold flex items-center gap-1 transition-colors hover:text-orange-600 ${card.followUpDate ? 'text-orange-600' : 'text-gray-600'}`}
+                title={card.followUpDate ? `Follow-up: ${new Date(card.followUpDate).toLocaleDateString()}` : 'Set follow-up date'}
+              >
+                <Calendar className="w-3 h-3" />
+                {card.followUpDate ? new Date(card.followUpDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Follow-up'}
+              </button>
+              
+              {showFollowUpPicker === card.id && (
+                <div className="absolute bottom-full right-0 mb-1 bg-white rounded-lg shadow-xl border border-gray-200 p-3 z-50 min-w-[200px]">
+                  <input
+                    type="date"
+                    value={card.followUpDate || ''}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      updateCardFollowUp(columnId, card.id, e.target.value);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-full px-2 py-1 border rounded text-sm mb-2"
+                    autoFocus
+                  />
+                  <div className="flex gap-1 flex-wrap">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const tomorrow = new Date();
+                        tomorrow.setDate(tomorrow.getDate() + 1);
+                        updateCardFollowUp(columnId, card.id, tomorrow.toISOString().split('T')[0]);
+                      }}
+                      className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded"
+                    >
+                      Tomorrow
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const nextWeek = new Date();
+                        nextWeek.setDate(nextWeek.getDate() + 7);
+                        updateCardFollowUp(columnId, card.id, nextWeek.toISOString().split('T')[0]);
+                      }}
+                      className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded"
+                    >
+                      1 Week
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const nextMonth = new Date();
+                        nextMonth.setDate(nextMonth.getDate() + 30);
+                        updateCardFollowUp(columnId, card.id, nextMonth.toISOString().split('T')[0]);
+                      }}
+                      className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded"
+                    >
+                      1 Month
+                    </button>
+                    {card.followUpDate && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          updateCardFollowUp(columnId, card.id, '');
+                        }}
+                        className="px-2 py-1 text-xs bg-red-100 hover:bg-red-200 text-red-600 rounded"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
           <button
             onClick={(e) => { e.stopPropagation(); openCRMModal(card, columnId); }}
@@ -1647,6 +1741,13 @@ If any field is not found, use an empty string.`
         <div 
           className="fixed inset-0 z-40" 
           onClick={() => setShowStatusMenu(null)}
+        />
+      )}
+      
+      {showFollowUpPicker && (
+        <div 
+          className="fixed inset-0 z-40" 
+          onClick={() => setShowFollowUpPicker(null)}
         />
       )}
 
@@ -2023,10 +2124,21 @@ If any field is not found, use an empty string.`
                                 className="relative cursor-pointer"
                                 onClick={() => openCRMModal(card, card._sourceColumnId)}
                               >
-                                <div className="absolute top-2 right-2 z-10">
+                                <div className="absolute top-2 right-2 z-10 flex flex-col gap-1 items-end">
                                   <div className="text-xs px-2 py-1 rounded font-semibold text-white" style={{ backgroundColor: '#1a1a1a' }}>
                                     {card._sourceBoardName}
                                   </div>
+                                  <div className="text-xs px-2 py-0.5 rounded font-semibold bg-gray-200 text-gray-700">
+                                    {card._sourceColumnName}
+                                  </div>
+                                  {card.status && (
+                                    <div 
+                                      className="text-xs px-2 py-0.5 rounded font-semibold"
+                                      style={{ backgroundColor: '#FFF3F0', color: '#E84E26' }}
+                                    >
+                                      {card.status}
+                                    </div>
+                                  )}
                                 </div>
                                 <div className="pointer-events-none">
                                   {renderRecruitmentCard(card, card._sourceColumnId)}
@@ -2143,7 +2255,7 @@ If any field is not found, use an empty string.`
         </div>
       </div>
 
-      {/* Add remaining modals here - I'll continue in next message if needed */}
+      {/* Modals */}
       
       {/* Add Column Modal */}
       {showAddColumnModal && (
@@ -2334,6 +2446,207 @@ If any field is not found, use an empty string.`
                   setCsvHeaders([]);
                 }}
                 className="px-6 py-3 border-2 border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-semibold text-gray-700"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Card Modal */}
+      {showAddCardModal && addCardColumn && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="px-6 py-4 flex items-center justify-between border-b-4" style={{ borderBottomColor: '#E84E26' }}>
+              <h2 className="text-xl font-bold text-gray-800">
+                {currentBoardType === 'todo' ? 'Add Task' : 'Add Candidate'}
+              </h2>
+              <button
+                onClick={() => {
+                  setShowAddCardModal(false);
+                  setAddCardColumn(null);
+                  setNewCardFile(null);
+                }}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  {currentBoardType === 'todo' ? 'Task Title' : 'Name'} *
+                </label>
+                <input
+                  type="text"
+                  value={newCardData.clientName}
+                  onChange={(e) => setNewCardData({...newCardData, clientName: e.target.value})}
+                  className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-orange-500 focus:outline-none"
+                  autoFocus
+                />
+              </div>
+              
+              {currentBoardType !== 'todo' && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">Email</label>
+                      <input
+                        type="email"
+                        value={newCardData.email}
+                        onChange={(e) => setNewCardData({...newCardData, email: e.target.value})}
+                        className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-orange-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">Phone</label>
+                      <input
+                        type="tel"
+                        value={newCardData.phone}
+                        onChange={(e) => setNewCardData({...newCardData, phone: e.target.value})}
+                        className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-orange-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Company</label>
+                    <input
+                      type="text"
+                      value={newCardData.companyName}
+                      onChange={(e) => setNewCardData({...newCardData, companyName: e.target.value})}
+                      className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-orange-500 focus:outline-none"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Status</label>
+                    <select
+                      value={newCardData.status}
+                      onChange={(e) => setNewCardData({...newCardData, status: e.target.value})}
+                      className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-orange-500 focus:outline-none"
+                    >
+                      {statusOptions.map(status => (
+                        <option key={status} value={status}>{status}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Resume (PDF)</label>
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      onChange={(e) => setNewCardFile(e.target.files[0])}
+                      className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-orange-500 focus:outline-none"
+                    />
+                  </div>
+                </>
+              )}
+              
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  {currentBoardType === 'todo' ? 'Due Date' : 'Follow-up Date'}
+                </label>
+                <input
+                  type="date"
+                  value={newCardData.followUpDate}
+                  onChange={(e) => setNewCardData({...newCardData, followUpDate: e.target.value})}
+                  className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-orange-500 focus:outline-none"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Notes</label>
+                <textarea
+                  value={newCardData.notes}
+                  onChange={(e) => setNewCardData({...newCardData, notes: e.target.value})}
+                  rows={3}
+                  className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-orange-500 focus:outline-none resize-none"
+                />
+              </div>
+            </div>
+            
+            <div className="px-6 py-4 border-t bg-gray-50 flex gap-3">
+              <button
+                onClick={addNewCard}
+                className="flex-1 py-3 px-4 rounded-lg font-bold text-white transition-all hover:opacity-90"
+                style={{ backgroundColor: '#E84E26' }}
+              >
+                {currentBoardType === 'todo' ? 'Add Task' : 'Add Candidate'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowAddCardModal(false);
+                  setAddCardColumn(null);
+                  setNewCardFile(null);
+                }}
+                className="px-6 py-3 border-2 border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-semibold text-gray-700"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Move Card Modal */}
+      {showMoveModal && cardToMove && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="px-6 py-4 flex items-center justify-between border-b-4" style={{ borderBottomColor: '#E84E26' }}>
+              <h2 className="text-xl font-bold text-gray-800">Move Card</h2>
+              <button
+                onClick={() => {
+                  setShowMoveModal(false);
+                  setCardToMove(null);
+                }}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1">
+              <p className="text-sm text-gray-600 mb-4">
+                Moving: <span className="font-semibold">{cardToMove.card?.title}</span>
+              </p>
+              
+              <div className="space-y-3">
+                {Object.entries(boards)
+                  .filter(([id, board]) => board.type !== 'followup')
+                  .map(([boardId, board]) => (
+                    <div key={boardId} className="border rounded-lg overflow-hidden">
+                      <div className="bg-gray-100 px-3 py-2 font-semibold text-sm text-gray-700">
+                        {board.name}
+                        {boardId === currentBoardId && <span className="text-gray-400 ml-2">(current)</span>}
+                      </div>
+                      <div className="p-2 space-y-1">
+                        {Object.entries(board.columns || {}).map(([colId, col]) => (
+                          <button
+                            key={colId}
+                            onClick={() => moveCardToBoard(boardId, colId)}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-orange-50 rounded transition-colors"
+                          >
+                            {col.title}
+                            <span className="text-gray-400 ml-2">({col.cards?.length || 0})</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+            
+            <div className="px-6 py-4 border-t bg-gray-50">
+              <button
+                onClick={() => {
+                  setShowMoveModal(false);
+                  setCardToMove(null);
+                }}
+                className="w-full py-2 px-4 border-2 border-gray-300 rounded-lg hover:bg-gray-100 transition-colors font-semibold text-gray-700"
               >
                 Cancel
               </button>
@@ -2678,7 +2991,10 @@ If any field is not found, use an empty string.`
 
               {selectedCard._sourceBoardName && (
                 <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
-                  From board: <span className="font-semibold">{selectedCard._sourceBoardName}</span>
+                  From: <span className="font-semibold">{selectedCard._sourceBoardName}</span>
+                  {selectedCard._sourceColumnName && (
+                    <span> → <span className="font-semibold">{selectedCard._sourceColumnName}</span></span>
+                  )}
                 </div>
               )}
             </div>
