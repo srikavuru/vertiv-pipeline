@@ -545,6 +545,59 @@ export default function PDFKanban() {
     }
   };
 
+  // Export current board to CSV
+  const exportCSV = () => {
+    if (!boards || !currentBoardId || !boards[currentBoardId]) return;
+    
+    const board = boards[currentBoardId];
+    const allCards = [];
+    
+    // Collect all cards with their column info
+    Object.entries(board.columns || {}).forEach(([colId, column]) => {
+      (column.cards || []).forEach(card => {
+        allCards.push({
+          Column: column.title,
+          Name: card.title || card.clientName || '',
+          Company: card.companyName || '',
+          Email: card.email || '',
+          Phone: card.phone || '',
+          Status: card.status || '',
+          'Follow-up Date': card.followUpDate || '',
+          'Upload Date': card.uploadDate || '',
+          Notes: (card.notes || '').replace(/"/g, '""').replace(/\n/g, ' ')
+        });
+      });
+    });
+    
+    if (allCards.length === 0) {
+      notify('No cards to export', 2000);
+      return;
+    }
+    
+    // Create CSV content
+    const headers = Object.keys(allCards[0]);
+    const csvRows = [
+      headers.join(','),
+      ...allCards.map(card => 
+        headers.map(h => `"${card[h]}"`).join(',')
+      )
+    ];
+    const csvContent = csvRows.join('\n');
+    
+    // Download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${board.name.replace(/[^a-z0-9]/gi, '-')}-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    notify(`✓ Exported ${allCards.length} cards to CSV`);
+  };
+
   // Import
   const importData = (e) => {
     if (!e?.target?.files?.[0]) return;
@@ -869,6 +922,14 @@ export default function PDFKanban() {
             >
               <Download className="w-4 h-4" />
               Backup
+            </button>
+            <button 
+              onClick={exportCSV} 
+              type="button"
+              className="px-3 py-1.5 bg-teal-600 text-white rounded-lg text-sm hover:bg-teal-700 transition-colors flex items-center gap-1"
+            >
+              <Download className="w-4 h-4" />
+              CSV
             </button>
             <label className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm cursor-pointer hover:bg-green-700 transition-colors flex items-center gap-1">
               <Upload className="w-4 h-4" />
