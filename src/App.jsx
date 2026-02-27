@@ -94,10 +94,12 @@ export default function PDFKanban() {
     const loadData = async () => {
       try {
         const result = { value: localStorage.getItem('recruitment-boards-data') };
+        console.log('Load attempt, found data:', !!result.value);
         
         if (result && result.value) {
           const savedData = JSON.parse(result.value);
           if (savedData.boards && Object.keys(savedData.boards).length > 0) {
+            console.log('Loading saved boards:', Object.keys(savedData.boards).length);
             setBoards(savedData.boards);
             setArchivedBoards(savedData.archivedBoards || {});
             setCurrentBoardId(savedData.currentBoardId || Object.keys(savedData.boards)[0]);
@@ -107,6 +109,7 @@ export default function PDFKanban() {
         }
         
         // No storage data - first time user
+        console.log('No saved data, using default');
         setBoards(EMPTY_DEFAULT);
         setCurrentBoardId('board1');
         
@@ -149,6 +152,7 @@ export default function PDFKanban() {
         currentBoardId,
         savedAt: new Date().toISOString()
       }));
+      console.log('Data saved to localStorage');
     } catch (error) {
       console.error('Save error:', error);
     }
