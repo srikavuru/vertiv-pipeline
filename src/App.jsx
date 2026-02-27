@@ -13,7 +13,7 @@ const EMPTY_DEFAULT = {
       inProgress: { title: 'In Progress', cards: [] },
       done: { title: 'Done', cards: [] }
     },
-    statusOptions: ['New Lead', 'Contacted', 'Qualified', 'Proposal Sent', 'Negotiating', 'Closed Won', 'Closed Lost']
+    statusOptions: ['New Lead', 'Contacted', 'Scheduled', 'Screened', '2nd Attempt', 'Interview Scheduled', 'Offer Sent', 'Hired', 'No Answer']
   }
 };
 
@@ -68,7 +68,7 @@ export default function PDFKanban() {
 
   // Safe accessors
   const columns = boards?.[currentBoardId]?.columns || {};
-  const statusOptions = boards?.[currentBoardId]?.statusOptions || ['New Lead', 'Contacted', 'Qualified'];
+  const statusOptions = boards?.[currentBoardId]?.statusOptions || ['New Lead', 'Contacted', 'Scheduled', 'Screened', '2nd Attempt', 'Interview Scheduled', 'Offer Sent', 'Hired', 'No Answer'];
 
   // Safe column updater
   const safeSetColumns = (updater) => {
@@ -127,7 +127,13 @@ export default function PDFKanban() {
       const script = document.createElement('script');
       script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
       script.onload = () => {
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        if (window.pdfjsLib) {
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+          console.log('PDF.js loaded successfully');
+        }
+      };
+      script.onerror = () => {
+        console.error('Failed to load PDF.js library');
       };
       document.head.appendChild(script);
     }
@@ -496,7 +502,7 @@ export default function PDFKanban() {
         type: newBoardType,
         pinned: false,
         columns: defaultColumns,
-        statusOptions: newBoardType === 'todo' ? ['Low', 'Medium', 'High'] : ['New Lead', 'Contacted', 'Qualified', 'Proposal Sent', 'Negotiating', 'Closed Won', 'Closed Lost']
+        statusOptions: newBoardType === 'todo' ? ['Low', 'Medium', 'High'] : ['New Lead', 'Contacted', 'Scheduled', 'Screened', '2nd Attempt', 'Interview Scheduled', 'Offer Sent', 'Hired', 'No Answer']
       }
     }));
     setCurrentBoardId(boardId);
@@ -634,9 +640,16 @@ export default function PDFKanban() {
     
     setUploadNotification(`⏳ Processing ${files.length} resume${files.length > 1 ? 's' : ''}...`);
     
-    // Check if PDF.js is loaded
+    // Wait for PDF.js to load (up to 5 seconds)
     if (!window.pdfjsLib) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      for (let i = 0; i < 10; i++) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        if (window.pdfjsLib) break;
+      }
+    }
+    
+    if (!window.pdfjsLib) {
+      notify('⚠ PDF parser not loaded - using filename only', 3000);
     }
     
     const firstColumnId = Object.keys(columns)[0];
@@ -730,8 +743,10 @@ export default function PDFKanban() {
               }
             }
           } catch (pdfErr) {
-            console.warn('PDF parse error for', file.name, pdfErr);
+            console.warn('PDF parse error for', file.name, ':', pdfErr.message || pdfErr);
           }
+        } else {
+          console.log('PDF.js not available, using filename only');
         }
         
         // Fallback to filename if no name extracted
@@ -757,7 +772,7 @@ export default function PDFKanban() {
           companyName: '',
           email: email,
           phone: phone,
-          notes: `Resume: ${file.name}`,
+          notes: '',
           uploadDate: new Date().toLocaleDateString(),
           status: 'New Lead',
           isPriority: false,
