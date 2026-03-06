@@ -13,7 +13,7 @@ const EMPTY_DEFAULT = {
       inProgress: { title: 'In Progress', cards: [] },
       done: { title: 'Done', cards: [] }
     },
-    statusOptions: ['New Lead', 'Contacted', 'Scheduled', 'Screened', '2nd Attempt', 'Interview Scheduled', 'Offer Sent', 'Hired', 'No Answer']
+    statusOptions: ['New Lead', 'Contacted', 'Scheduled', 'Screened']
   }
 };
 
@@ -68,7 +68,7 @@ export default function PDFKanban() {
 
   // Safe accessors
   const columns = boards?.[currentBoardId]?.columns || {};
-  const statusOptions = boards?.[currentBoardId]?.statusOptions || ['New Lead', 'Contacted', 'Scheduled', 'Screened', '2nd Attempt', 'Interview Scheduled', 'Offer Sent', 'Hired', 'No Answer'];
+  const statusOptions = boards?.[currentBoardId]?.statusOptions || ['New Lead', 'Contacted', 'Scheduled', 'Screened'];
 
   // Safe column updater
   const safeSetColumns = (updater) => {
@@ -506,7 +506,7 @@ export default function PDFKanban() {
         type: newBoardType,
         pinned: false,
         columns: defaultColumns,
-        statusOptions: newBoardType === 'todo' ? ['Low', 'Medium', 'High'] : ['New Lead', 'Contacted', 'Scheduled', 'Screened', '2nd Attempt', 'Interview Scheduled', 'Offer Sent', 'Hired', 'No Answer']
+        statusOptions: newBoardType === 'todo' ? ['Low', 'Medium', 'High'] : ['New Lead', 'Contacted', 'Scheduled', 'Screened']
       }
     }));
     setCurrentBoardId(boardId);
