@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Upload, X, Mail, Phone, Building, Edit2, Search, Download, Trash2, Copy, Star, Pin, FileText, Archive, RotateCcw, Settings, GripVertical } from 'lucide-react';
 
-// Minimal empty default for first-time users only
+// Default template for new boards (based on Site Service Specialist Ashburn)
 const EMPTY_DEFAULT = {
   board1: {
     name: 'Main Board',
@@ -9,6 +9,9 @@ const EMPTY_DEFAULT = {
     pinned: true,
     columns: {
       todo: { title: 'To Do', cards: [] },
+      contacted: { title: 'Contacted', cards: [] },
+      secondAttempt: { title: '2nd Attempt', cards: [] },
+      scheduled: { title: 'Scheduled', cards: [] },
       screen: { title: 'Screen', cards: [] },
       inProgress: { title: 'In Progress', cards: [] },
       done: { title: 'Done', cards: [] }
@@ -497,7 +500,15 @@ export default function PDFKanban() {
     const boardId = 'board_' + Date.now();
     const defaultColumns = newBoardType === 'todo'
       ? { todo: { title: 'To Do', cards: [] }, done: { title: 'Done', cards: [] } }
-      : { todo: { title: 'To Do', cards: [] }, screen: { title: 'Screen', cards: [] }, inProgress: { title: 'In Progress', cards: [] }, done: { title: 'Done', cards: [] } };
+      : { 
+          todo: { title: 'To Do', cards: [] },
+          contacted: { title: 'Contacted', cards: [] },
+          secondAttempt: { title: '2nd Attempt', cards: [] },
+          scheduled: { title: 'Scheduled', cards: [] },
+          screen: { title: 'Screen', cards: [] },
+          inProgress: { title: 'In Progress', cards: [] },
+          done: { title: 'Done', cards: [] }
+        };
     
     setBoards(prev => ({
       ...prev,
