@@ -50,6 +50,7 @@ export default function PDFKanban() {
   const [editingColumn, setEditingColumn] = useState(null);
   const [editingStatusIndex, setEditingStatusIndex] = useState(null);
   const [showStatusMenu, setShowStatusMenu] = useState(null);
+  const [editingBoardId, setEditingBoardId] = useState(null);
   
   // Drag and drop
   const [draggedCard, setDraggedCard] = useState(null);
@@ -166,6 +167,19 @@ export default function PDFKanban() {
       console.error('Save error:', error);
     }
   }, [boards, archivedBoards, currentBoardId, boardOrder, hasLoaded]);
+
+  // Rename a board
+  const renameBoard = (boardId, newName) => {
+    if (!boardId || !boards[boardId] || !newName.trim()) {
+      setEditingBoardId(null);
+      return;
+    }
+    setBoards(prev => ({
+      ...prev,
+      [boardId]: { ...prev[boardId], name: newName.trim() }
+    }));
+    setEditingBoardId(null);
+  };
 
   // Archive a board
   const archiveBoard = (boardId) => {
@@ -1089,26 +1103,43 @@ export default function PDFKanban() {
             <div 
               key={boardId} 
               className={`relative group ${draggedBoard === boardId ? 'opacity-50' : ''}`}
-              draggable
-              onDragStart={(e) => handleBoardDragStart(e, boardId)}
+              draggable={editingBoardId !== boardId}
+              onDragStart={(e) => editingBoardId !== boardId && handleBoardDragStart(e, boardId)}
               onDragOver={(e) => handleBoardDragOver(e, boardId)}
               onDrop={(e) => handleBoardDrop(e, boardId)}
               onDragEnd={handleBoardDragEnd}
             >
-              <button
+              <div
                 onClick={() => setCurrentBoardId(boardId)}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-t-lg text-sm font-medium whitespace-nowrap transition-all cursor-grab active:cursor-grabbing ${
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-t-lg text-sm font-medium whitespace-nowrap transition-all ${editingBoardId !== boardId ? 'cursor-grab active:cursor-grabbing' : ''} ${
                   boardId === currentBoardId 
                     ? 'bg-gray-900 text-white border-t-2' + ' border-[#E84E26]' 
                     : 'text-gray-400 hover:text-white hover:bg-gray-700'
                 }`}
               >
                 {board.pinned && <Pin className="w-3 h-3" />}
-                {board.name}
+                {editingBoardId === boardId ? (
+                  <input
+                    type="text"
+                    defaultValue={board.name}
+                    autoFocus
+                    onClick={(e) => e.stopPropagation()}
+                    onBlur={(e) => renameBoard(boardId, e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') renameBoard(boardId, e.target.value);
+                      if (e.key === 'Escape') setEditingBoardId(null);
+                    }}
+                    className="bg-gray-700 text-white px-2 py-0.5 rounded text-sm w-32 focus:outline-none focus:ring-1 focus:ring-[#E84E26]"
+                  />
+                ) : (
+                  <span onDoubleClick={(e) => { e.stopPropagation(); setEditingBoardId(boardId); }}>
+                    {board.name}
+                  </span>
+                )}
                 <span className="text-xs opacity-60">
                   ({Object.values(board.columns || {}).reduce((sum, col) => sum + (col.cards?.length || 0), 0)})
                 </span>
-              </button>
+              </div>
               {/* Archive button - visible on hover */}
               {Object.keys(boards).length > 1 && (
                 <button
