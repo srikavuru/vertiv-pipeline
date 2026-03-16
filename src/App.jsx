@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, X, Mail, Phone, Building, Edit2, Search, Download, Trash2, Copy, Star, Pin, FileText, Archive, RotateCcw, Settings, GripVertical } from 'lucide-react';
+import { Upload, X, Mail, Phone, Building, Edit2, Search, Download, Trash2, Copy, Star, Pin, FileText, Archive, RotateCcw, Settings, GripVertical, Calendar } from 'lucide-react';
 
 // Default template for new boards (based on Site Service Specialist Ashburn)
 const EMPTY_DEFAULT = {
@@ -34,10 +34,10 @@ export default function PDFKanban() {
   const [showAddCardModal, setShowAddCardModal] = useState(false);
   const [showAddColumnModal, setShowAddColumnModal] = useState(false);
   const [showStatusManager, setShowStatusManager] = useState(false);
+  const [showFollowUpModal, setShowFollowUpModal] = useState(false);
   
   // Form state
   const [newBoardName, setNewBoardName] = useState('');
-  const [newBoardType, setNewBoardType] = useState('recruitment');
   const [newColumnTitle, setNewColumnTitle] = useState('');
   const [newStatusName, setNewStatusName] = useState('');
   const [newCardData, setNewCardData] = useState({
@@ -55,6 +55,8 @@ export default function PDFKanban() {
   const [draggedCard, setDraggedCard] = useState(null);
   const [draggedFrom, setDraggedFrom] = useState(null);
   const [draggedColumn, setDraggedColumn] = useState(null);
+  const [draggedBoard, setDraggedBoard] = useState(null);
+  const [boardOrder, setBoardOrder] = useState([]);
   
   // Search and filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -106,6 +108,7 @@ export default function PDFKanban() {
             setBoards(savedData.boards);
             setArchivedBoards(savedData.archivedBoards || {});
             setCurrentBoardId(savedData.currentBoardId || Object.keys(savedData.boards)[0]);
+            setBoardOrder(savedData.boardOrder || Object.keys(savedData.boards));
             setHasLoaded(true);
             return;
           }
@@ -115,11 +118,13 @@ export default function PDFKanban() {
         console.log('No saved data, using default');
         setBoards(EMPTY_DEFAULT);
         setCurrentBoardId('board1');
+        setBoardOrder(['board1']);
         
       } catch (error) {
         console.error('Load error:', error);
         setBoards(EMPTY_DEFAULT);
         setCurrentBoardId('board1');
+        setBoardOrder(['board1']);
       } finally {
         setHasLoaded(true);
       }
@@ -153,13 +158,14 @@ export default function PDFKanban() {
         boards, 
         archivedBoards,
         currentBoardId,
+        boardOrder,
         savedAt: new Date().toISOString()
       }));
       console.log('Data saved to localStorage');
     } catch (error) {
       console.error('Save error:', error);
     }
-  }, [boards, archivedBoards, currentBoardId, hasLoaded]);
+  }, [boards, archivedBoards, currentBoardId, boardOrder, hasLoaded]);
 
   // Archive a board
   const archiveBoard = (boardId) => {
@@ -178,6 +184,9 @@ export default function PDFKanban() {
       delete newBoards[boardId];
       return newBoards;
     });
+    
+    // Remove from boardOrder
+    setBoardOrder(prev => prev.filter(id => id !== boardId));
     
     // Switch to another board if we archived the current one
     if (currentBoardId === boardId) {
@@ -201,6 +210,9 @@ export default function PDFKanban() {
       ...prev,
       [boardId]: cleanBoard
     }));
+    
+    // Add back to boardOrder
+    setBoardOrder(prev => [...prev, boardId]);
     
     // Remove from archived
     setArchivedBoards(prev => {
@@ -498,32 +510,30 @@ export default function PDFKanban() {
   const createBoard = () => {
     if (!newBoardName.trim()) return;
     const boardId = 'board_' + Date.now();
-    const defaultColumns = newBoardType === 'todo'
-      ? { todo: { title: 'To Do', cards: [] }, done: { title: 'Done', cards: [] } }
-      : { 
-          todo: { title: 'To Do', cards: [] },
-          contacted: { title: 'Contacted', cards: [] },
-          secondAttempt: { title: '2nd Attempt', cards: [] },
-          scheduled: { title: 'Scheduled', cards: [] },
-          screen: { title: 'Screen', cards: [] },
-          inProgress: { title: 'In Progress', cards: [] },
-          done: { title: 'Done', cards: [] }
-        };
+    const defaultColumns = { 
+      todo: { title: 'To Do', cards: [] },
+      contacted: { title: 'Contacted', cards: [] },
+      secondAttempt: { title: '2nd Attempt', cards: [] },
+      scheduled: { title: 'Scheduled', cards: [] },
+      screen: { title: 'Screen', cards: [] },
+      inProgress: { title: 'In Progress', cards: [] },
+      done: { title: 'Done', cards: [] }
+    };
     
     setBoards(prev => ({
       ...prev,
       [boardId]: {
         name: newBoardName,
-        type: newBoardType,
+        type: 'recruitment',
         pinned: false,
         columns: defaultColumns,
-        statusOptions: newBoardType === 'todo' ? ['Low', 'Medium', 'High'] : ['New Lead', 'Contacted', '2nd Attempt', 'Scheduled', 'Screened', 'Submitted', 'HM Review', 'Interview Schedule', 'Offer Sent', 'Hired', 'No Response/Rejected']
+        statusOptions: ['New Lead', 'Contacted', '2nd Attempt', 'Scheduled', 'Screened', 'Submitted', 'HM Review', 'Interview Schedule', 'Offer Sent', 'Hired', 'No Response/Rejected']
       }
     }));
+    setBoardOrder(prev => [...prev, boardId]);
     setCurrentBoardId(boardId);
     setShowNewBoardModal(false);
     setNewBoardName('');
-    setNewBoardType('recruitment');
   };
 
   // Backup
@@ -874,6 +884,54 @@ export default function PDFKanban() {
     }
   };
 
+  // Get all cards with follow-up dates across all boards
+  const getFollowUpCards = () => {
+    if (!boards) return { overdue: [], today: [], tomorrow: [], thisWeek: [], later: [] };
+    
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+    const weekEnd = new Date(now);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+    const weekEndStr = weekEnd.toISOString().split('T')[0];
+    
+    const cards = { overdue: [], today: [], tomorrow: [], thisWeek: [], later: [] };
+    
+    Object.entries(boards).forEach(([boardId, board]) => {
+      Object.entries(board.columns || {}).forEach(([colId, col]) => {
+        (col.cards || []).forEach(card => {
+          if (card.followUpDate) {
+            const cardData = { ...card, boardId, boardName: board.name, columnId: colId, columnName: col.title };
+            if (card.followUpDate < todayStr) {
+              cards.overdue.push(cardData);
+            } else if (card.followUpDate === todayStr) {
+              cards.today.push(cardData);
+            } else if (card.followUpDate === tomorrowStr) {
+              cards.tomorrow.push(cardData);
+            } else if (card.followUpDate <= weekEndStr) {
+              cards.thisWeek.push(cardData);
+            } else {
+              cards.later.push(cardData);
+            }
+          }
+        });
+      });
+    });
+    
+    // Sort each group by date
+    Object.keys(cards).forEach(key => {
+      cards[key].sort((a, b) => a.followUpDate.localeCompare(b.followUpDate));
+    });
+    
+    return cards;
+  };
+
+  const followUpCards = getFollowUpCards();
+  const totalFollowUps = Object.values(followUpCards).reduce((sum, arr) => sum + arr.length, 0);
+  const urgentFollowUps = followUpCards.overdue.length + followUpCards.today.length;
+
   // Loading state
   if (!boards) {
     return (
@@ -883,11 +941,51 @@ export default function PDFKanban() {
     );
   }
 
+  // Sort boards: first by boardOrder, with any new boards at the end
   const sortedBoards = Object.entries(boards).sort((a, b) => {
-    if (a[1].pinned && !b[1].pinned) return -1;
-    if (!a[1].pinned && b[1].pinned) return 1;
+    const aIndex = boardOrder.indexOf(a[0]);
+    const bIndex = boardOrder.indexOf(b[0]);
+    // If both are in boardOrder, sort by their order
+    if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+    // If only one is in boardOrder, it comes first
+    if (aIndex !== -1) return -1;
+    if (bIndex !== -1) return 1;
+    // If neither is in boardOrder, maintain their original order
     return 0;
   });
+
+  // Board drag handlers
+  const handleBoardDragStart = (e, boardId) => {
+    setDraggedBoard(boardId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleBoardDragOver = (e, boardId) => {
+    e.preventDefault();
+    if (!draggedBoard || draggedBoard === boardId) return;
+  };
+
+  const handleBoardDrop = (e, targetBoardId) => {
+    e.preventDefault();
+    if (!draggedBoard || draggedBoard === targetBoardId) return;
+    
+    const currentOrder = boardOrder.length > 0 ? [...boardOrder] : Object.keys(boards);
+    const draggedIndex = currentOrder.indexOf(draggedBoard);
+    const targetIndex = currentOrder.indexOf(targetBoardId);
+    
+    if (draggedIndex === -1 || targetIndex === -1) return;
+    
+    // Remove dragged board and insert at target position
+    currentOrder.splice(draggedIndex, 1);
+    currentOrder.splice(targetIndex, 0, draggedBoard);
+    
+    setBoardOrder(currentOrder);
+    setDraggedBoard(null);
+  };
+
+  const handleBoardDragEnd = () => {
+    setDraggedBoard(null);
+  };
 
   return (
     <div className="h-screen flex flex-col bg-gray-900">
@@ -938,6 +1036,13 @@ export default function PDFKanban() {
               <Settings className="w-4 h-4" />
               Statuses
             </button>
+            <button 
+              onClick={() => setShowFollowUpModal(true)} 
+              className={`px-3 py-1.5 text-white rounded-lg text-sm transition-colors flex items-center gap-1 ${urgentFollowUps > 0 ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-700 hover:bg-gray-600'}`}
+            >
+              <Calendar className="w-4 h-4" />
+              Follow-ups {totalFollowUps > 0 && `(${totalFollowUps})`}
+            </button>
             <div className="h-6 w-px bg-gray-600 mx-1" />
             <label className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm cursor-pointer hover:bg-purple-700 transition-colors flex items-center gap-1 font-semibold">
               <FileText className="w-4 h-4" />
@@ -981,10 +1086,18 @@ export default function PDFKanban() {
         {/* Board tabs row */}
         <div className="px-4 pb-2 flex items-center gap-1 overflow-x-auto">
           {sortedBoards.map(([boardId, board]) => (
-            <div key={boardId} className="relative group">
+            <div 
+              key={boardId} 
+              className={`relative group ${draggedBoard === boardId ? 'opacity-50' : ''}`}
+              draggable
+              onDragStart={(e) => handleBoardDragStart(e, boardId)}
+              onDragOver={(e) => handleBoardDragOver(e, boardId)}
+              onDrop={(e) => handleBoardDrop(e, boardId)}
+              onDragEnd={handleBoardDragEnd}
+            >
               <button
                 onClick={() => setCurrentBoardId(boardId)}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-t-lg text-sm font-medium whitespace-nowrap transition-all ${
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-t-lg text-sm font-medium whitespace-nowrap transition-all cursor-grab active:cursor-grabbing ${
                   boardId === currentBoardId 
                     ? 'bg-gray-900 text-white border-t-2' + ' border-[#E84E26]' 
                     : 'text-gray-400 hover:text-white hover:bg-gray-700'
@@ -1446,14 +1559,6 @@ export default function PDFKanban() {
               className="w-full px-3 py-2 border-2 rounded-lg mb-4"
               autoFocus
             />
-            <select
-              value={newBoardType}
-              onChange={(e) => setNewBoardType(e.target.value)}
-              className="w-full px-3 py-2 border-2 rounded-lg mb-4"
-            >
-              <option value="recruitment">Recruitment Pipeline</option>
-              <option value="todo">To-Do List</option>
-            </select>
             <div className="flex gap-3">
               <button onClick={createBoard} style={{ backgroundColor: '#E84E26' }} className="flex-1 py-2 text-white rounded-lg font-semibold hover:opacity-90">
                 Create
@@ -1461,6 +1566,161 @@ export default function PDFKanban() {
               <button onClick={() => setShowNewBoardModal(false)} className="px-6 py-2 border-2 rounded-lg">
                 Cancel
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Follow-up Modal */}
+      {showFollowUpModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-3xl w-full p-6 max-h-[85vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Calendar className="w-5 h-5" style={{ color: '#E84E26' }} />
+                Follow-ups
+              </h2>
+              <button onClick={() => setShowFollowUpModal(false)} className="p-1 hover:bg-gray-100 rounded">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="overflow-y-auto flex-1 space-y-4">
+              {totalFollowUps === 0 ? (
+                <p className="text-gray-500 text-center py-8">No follow-ups scheduled</p>
+              ) : (
+                <>
+                  {/* Overdue */}
+                  {followUpCards.overdue.length > 0 && (
+                    <div>
+                      <h3 className="font-semibold text-red-600 mb-2 flex items-center gap-2">
+                        🔴 Overdue ({followUpCards.overdue.length})
+                      </h3>
+                      <div className="space-y-2">
+                        {followUpCards.overdue.map(card => (
+                          <div 
+                            key={card.id} 
+                            onClick={() => { setCurrentBoardId(card.boardId); setSelectedCard({ ...card, columnId: card.columnId }); setShowFollowUpModal(false); setShowCRMModal(true); }}
+                            className="p-3 bg-red-50 border border-red-200 rounded-lg cursor-pointer hover:bg-red-100 transition-colors"
+                          >
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="font-semibold">{card.clientName || card.title}</p>
+                                <p className="text-sm text-gray-600">{card.boardName} → {card.columnName}</p>
+                              </div>
+                              <span className="text-sm text-red-600 font-medium">{card.followUpDate}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Today */}
+                  {followUpCards.today.length > 0 && (
+                    <div>
+                      <h3 className="font-semibold text-orange-600 mb-2 flex items-center gap-2">
+                        🟠 Today ({followUpCards.today.length})
+                      </h3>
+                      <div className="space-y-2">
+                        {followUpCards.today.map(card => (
+                          <div 
+                            key={card.id} 
+                            onClick={() => { setCurrentBoardId(card.boardId); setSelectedCard({ ...card, columnId: card.columnId }); setShowFollowUpModal(false); setShowCRMModal(true); }}
+                            className="p-3 bg-orange-50 border border-orange-200 rounded-lg cursor-pointer hover:bg-orange-100 transition-colors"
+                          >
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="font-semibold">{card.clientName || card.title}</p>
+                                <p className="text-sm text-gray-600">{card.boardName} → {card.columnName}</p>
+                              </div>
+                              <span className="text-sm text-orange-600 font-medium">Today</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tomorrow */}
+                  {followUpCards.tomorrow.length > 0 && (
+                    <div>
+                      <h3 className="font-semibold text-yellow-600 mb-2 flex items-center gap-2">
+                        🟡 Tomorrow ({followUpCards.tomorrow.length})
+                      </h3>
+                      <div className="space-y-2">
+                        {followUpCards.tomorrow.map(card => (
+                          <div 
+                            key={card.id} 
+                            onClick={() => { setCurrentBoardId(card.boardId); setSelectedCard({ ...card, columnId: card.columnId }); setShowFollowUpModal(false); setShowCRMModal(true); }}
+                            className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg cursor-pointer hover:bg-yellow-100 transition-colors"
+                          >
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="font-semibold">{card.clientName || card.title}</p>
+                                <p className="text-sm text-gray-600">{card.boardName} → {card.columnName}</p>
+                              </div>
+                              <span className="text-sm text-yellow-600 font-medium">Tomorrow</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* This Week */}
+                  {followUpCards.thisWeek.length > 0 && (
+                    <div>
+                      <h3 className="font-semibold text-blue-600 mb-2 flex items-center gap-2">
+                        🔵 This Week ({followUpCards.thisWeek.length})
+                      </h3>
+                      <div className="space-y-2">
+                        {followUpCards.thisWeek.map(card => (
+                          <div 
+                            key={card.id} 
+                            onClick={() => { setCurrentBoardId(card.boardId); setSelectedCard({ ...card, columnId: card.columnId }); setShowFollowUpModal(false); setShowCRMModal(true); }}
+                            className="p-3 bg-blue-50 border border-blue-200 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors"
+                          >
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="font-semibold">{card.clientName || card.title}</p>
+                                <p className="text-sm text-gray-600">{card.boardName} → {card.columnName}</p>
+                              </div>
+                              <span className="text-sm text-blue-600 font-medium">{card.followUpDate}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Later */}
+                  {followUpCards.later.length > 0 && (
+                    <div>
+                      <h3 className="font-semibold text-gray-600 mb-2 flex items-center gap-2">
+                        ⚪ Later ({followUpCards.later.length})
+                      </h3>
+                      <div className="space-y-2">
+                        {followUpCards.later.map(card => (
+                          <div 
+                            key={card.id} 
+                            onClick={() => { setCurrentBoardId(card.boardId); setSelectedCard({ ...card, columnId: card.columnId }); setShowFollowUpModal(false); setShowCRMModal(true); }}
+                            className="p-3 bg-gray-50 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
+                          >
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="font-semibold">{card.clientName || card.title}</p>
+                                <p className="text-sm text-gray-600">{card.boardName} → {card.columnName}</p>
+                              </div>
+                              <span className="text-sm text-gray-600 font-medium">{card.followUpDate}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>
